@@ -6,7 +6,7 @@ dotenv.config()
 // Server config
 
 export const SERVER_CONFIG = {
-    port: process.ev.PORT || 3001,
+    port: process.env.PORT || 3001,
     redisUrl: process.env.REDIS_URL || "redis://localhost: 6379",
 
     // Fail-open = allow requests when Redis is down
@@ -50,7 +50,7 @@ export const ROUTE_CONFIGS: RouteConfig[] = [
     {
         route: "/login",
         limit: 5,
-        widowSecs: 60    // per 60 seconds 
+        windowSecs: 60    // per 60 seconds 
     },
     {
         route: "/posts",

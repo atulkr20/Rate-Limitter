@@ -25,7 +25,7 @@ logger.info({ sha: slidingWindowScriptSHA }, "Lua Script loaded into Redis")
 
 // other files call this to get the SHA when they need to run the script
 
-export function slidingWindowSHA(): string {
+export function getSlidingWindowScriptSHA(): string {
     if (!slidingWindowScriptSHA) {
         throw new Error ("Lua script not loaded yet call loadLuaScripts() first")
     }
