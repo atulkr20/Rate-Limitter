@@ -20,7 +20,7 @@ retryStrategy: function(times: number) {
 maxRetriesPerRequest: 3
 })
 
-// These are evebnt Listeners they fire when something happens to the connection 
+// These are event Listeners they fire when something happens to the connection 
 
 redis.on('conect', function() {
     logger.info('Redis connected successfully')
