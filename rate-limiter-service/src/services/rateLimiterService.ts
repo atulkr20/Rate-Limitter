@@ -24,9 +24,9 @@ export async function checkRateLimit(
     const windowSecs = routeConfig ? routeConfig.windowSecs : planConfig.windowSecs
 
 // Build the Redis Key
-// key format --> ratelimit: userId:route
-// Each user + route combination gets its own ZSET in Redis
-const redisKey = `ratelimit:${request.userId}:${request.route}`
+// key format --> ratelimit: userId:ip:route
+// Each user + IP + route combination gets its own ZSET in Redis
+const redisKey = `ratelimit:${request.userId}:${request.ip}:${request.route}`
 
 // current time in milliseconds used as the score in ZSET
 const nowMs = Date.now()

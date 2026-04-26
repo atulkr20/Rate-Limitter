@@ -18,6 +18,7 @@ export interface RouteConfig {
 
 export interface RateLimitRequest {
     userId: string
+    ip: string
     route: string
     plan: Plan
 }
