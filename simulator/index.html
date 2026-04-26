@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Rate Limiter — Architecture Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04040e;--surface:#0c0c18;--s2:#111120;--border:#1a1a2e;
+  --text:#e2e8f0;--muted:#475569;--dim:#94a3b8;
+  --green:#22c55e;--red:#ef4444;--cyan:#06b6d4;
+  --blue:#6366f1;--amber:#f59e0b;--orange:#f97316;--purple:#a855f7;
+}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(99,102,241,0.035)1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.035)1px,transparent 1px);background-size:50px 50px;pointer-events:none}
+
+/* ── TOP BAR ── */
+.topbar{height:64px;background:rgba(6,6,18,0.98);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 18px;flex-shrink:0;z-index:10;position:relative}
+.logo{display:flex;align-items:center;gap:9px;padding-right:12px;border-right:1px solid var(--border);margin-right:2px}
+.logo-icon{font-size:20px}
+.logo-name{font-size:14px;font-weight:800;letter-spacing:-.3px}
+.logo-sub{font-size:9px;color:var(--muted);font-weight:500;margin-top:1px}
+.ctrl{display:flex;flex-direction:column;gap:3px}
+.ctrl label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.ctrl select,.ctrl input{background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;padding:5px 9px;outline:none;cursor:pointer;transition:border-color .2s}
+.ctrl select:focus,.ctrl input:focus{border-color:var(--blue)}
+.ctrl input{width:92px}
+.tb-gap{flex:1}
+.auto-row{display:flex;align-items:center;gap:5px}
+.auto-lbl{font-size:10px;color:var(--muted);margin-right:2px}
+.sp-btn{background:var(--s2);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;font-weight:600;padding:4px 9px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s}
+.sp-btn.on,.sp-btn:hover{background:rgba(6,182,212,.12);border-color:rgba(6,182,212,.4);color:var(--cyan)}
+.btn{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .2s}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-send{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.35)}
+.btn-send:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,.55)}
+.btn-burst{background:linear-gradient(135deg,var(--amber),var(--orange));color:#000;font-weight:800}
+.btn-burst:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(245,158,11,.45)}
+.btn-rst{background:var(--s2);border:1px solid var(--border);color:var(--dim);padding:8px 12px;font-size:14px}
+.btn-rst:hover{background:var(--border);color:var(--text)}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;overflow:hidden;position:relative}
+.arch{flex:1;display:flex;align-items:center;justify-content:center;padding:10px 12px;overflow:hidden}
+#arch-svg{width:100%;height:100%;max-height:calc(100vh - 64px)}
+
+/* SVG text */
+.n-title{font-family:'Inter',sans-serif;font-weight:700;font-size:13px;fill:#dde4f0}
+.n-sub{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;fill:#64748b}
+.n-meta{font-family:'JetBrains Mono',monospace;font-weight:400;font-size:9px;fill:#3a4a5e}
+.conn-lbl{font-family:'JetBrains Mono',monospace;font-size:9px;fill:#22224a;font-weight:600}
+.tl-lbl{font-family:'JetBrains Mono',monospace;font-size:8px;fill:#2a2a50;font-weight:600}
+
+/* Flow dash anim */
+.dash-line{stroke-dasharray:7 5;animation:dflow 1.1s linear infinite}
+@keyframes dflow{to{stroke-dashoffset:-24}}
+
+/* Node active border pulse */
+@keyframes borderPulse{0%,100%{opacity:.7}50%{opacity:1}}
+.halo-active{animation:borderPulse .9s ease-in-out infinite}
+
+/* ── SIDEBAR ── */
+.sidebar{width:280px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sb-sec{padding:13px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.sb-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.stat-box{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 6px;text-align:center;transition:border-color .3s}
+.sv{font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1;transition:color .3s}
+.sl{font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-top:4px}
+.clr-g{color:var(--green)}.clr-r{color:var(--red)}.clr-c{color:var(--cyan)}
+.stat-box.pulse-ok{border-color:rgba(34,197,94,.5);animation:statPulse .4s ease}
+.stat-box.pulse-err{border-color:rgba(239,68,68,.5);animation:statPulse .4s ease}
+@keyframes statPulse{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
+
+.resp-box{border-radius:8px;overflow:hidden;border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;display:none}
+.resp-box.ok{border-color:rgba(34,197,94,.35)}.resp-box.err{border-color:rgba(239,68,68,.35)}
+.resp-hdr{padding:7px 12px;font-weight:700;font-size:11px;display:flex;align-items:center;gap:6px}
+.resp-hdr.ok{background:rgba(34,197,94,.1);color:var(--green)}.resp-hdr.err{background:rgba(239,68,68,.1);color:var(--red)}
+.resp-body{background:var(--s2);padding:10px 12px;font-size:10.5px;line-height:1.85;color:var(--dim)}
+.jk{color:#818cf8}.jvt{color:var(--green)}.jvf{color:var(--red)}.jvn{color:var(--amber)}.jvs{color:var(--cyan)}
+
+.log-list{flex:1;overflow-y:auto;padding:7px}
+.log-list::-webkit-scrollbar{width:3px}
+.log-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.log-entry{display:flex;gap:7px;padding:7px 8px;border-radius:6px;margin-bottom:4px;animation:logIn .2s ease;border:1px solid transparent;font-size:11px}
+@keyframes logIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.log-entry.ok{background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.14)}
+.log-entry.err{background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.14)}
+.log-entry.sys{background:var(--s2);border-color:var(--border)}
+.log-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);min-width:52px;padding-top:1px}
+.log-msg{color:var(--dim);line-height:1.4;font-size:11px}
+.log-msg strong{color:var(--text)}
+.lc-btn{font-size:10px;padding:2px 8px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:4px;cursor:pointer}
+.lc-btn:hover{background:var(--border)}
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<div class="topbar">
+  <div class="logo">
+    <span class="logo-icon">🛡️</span>
+    <div><div class="logo-name">Rate Limiter</div><div class="logo-sub">Sliding Window · Redis ZSET · Lua Atomic</div></div>
+  </div>
+  <div class="ctrl"><label>User ID</label><input id="userId" type="text" value="user_42"/></div>
+  <div class="ctrl">
+    <label>Route</label>
+    <select id="route">
+      <option value="/login">/login — 5 req/60s</option>
+      <option value="/posts" selected>/posts — 200/60s</option>
+      <option value="/profile">/profile — 50/60s</option>
+      <option value="/api/data">/api/data — plan</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Plan</label>
+    <select id="plan">
+      <option value="FREE">FREE · 100/15min</option>
+      <option value="PRO">PRO · 1000/15min</option>
+      <option value="ENTERPRISE">ENTERPRISE · 10k/15min</option>
+    </select>
+  </div>
+  <div class="tb-gap"></div>
+  <div class="auto-row">
+    <span class="auto-lbl">Auto:</span>
+    <button class="sp-btn on" id="ab0"   onclick="setAuto(0)">OFF</button>
+    <button class="sp-btn"  id="ab700"  onclick="setAuto(700)">1.5/s</button>
+    <button class="sp-btn"  id="ab280"  onclick="setAuto(280)">3.5/s</button>
+    <button class="sp-btn"  id="ab110"  onclick="setAuto(110)">9/s</button>
+  </div>
+  <button class="btn btn-send"  id="sendBtn"  onclick="triggerSend()">⚡ Send</button>
+  <button class="btn btn-burst" id="burstBtn" onclick="triggerBurst()">🔥 Burst ×10</button>
+  <button class="btn btn-rst"   onclick="hardReset()">↺</button>
+</div>
+
+<!-- ── MAIN ── -->
+<div class="main">
+  <div class="arch">
+    <!-- viewBox expanded to 870×568 to fit timeline strip at bottom -->
+    <svg id="arch-svg" viewBox="0 0 870 568" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <!-- Glow filters -->
+        <filter id="glow-s" x="-60%"  y="-60%"  width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="glow-m" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="6"   result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="glow-l" x="-140%" y="-140%" width="380%" height="380%">
+          <feGaussianBlur stdDeviation="11"  result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <!-- Blur-only for path glow -->
+        <filter id="blur-path" x="-30%" y="-200%" width="160%" height="500%">
+          <feGaussianBlur stdDeviation="4"/>
+        </filter>
+
+        <!-- Node gradients -->
+        <linearGradient id="g-client" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#1a0e3f"/><stop offset="100%" stop-color="#2c1860"/>
+        </linearGradient>
+        <linearGradient id="g-rl" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#021520"/><stop offset="100%" stop-color="#062840"/>
+        </linearGradient>
+        <linearGradient id="g-redis" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#1e0a02"/><stop offset="100%" stop-color="#301808"/>
+        </linearGradient>
+        <linearGradient id="g-api" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#031812"/><stop offset="100%" stop-color="#082e1e"/>
+        </linearGradient>
+
+        <!-- Meter gradient: RL -->
+        <linearGradient id="g-mrl" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%"   stop-color="#06b6d4"/>
+          <stop offset="100%" stop-color="#0ea5e9"/>
+        </linearGradient>
+        <!-- Meter gradient: Redis -->
+        <linearGradient id="g-mredis" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%"   stop-color="#f97316"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+
+        <!-- Arrow marker -->
+        <marker id="arr" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+          <path d="M0,0 L7,3.5 L0,7 Z" fill="#1c1c3a"/>
+        </marker>
+      </defs>
+
+      <!-- ══ BACKGROUND AMBIENT PARTICLES ══ -->
+      <g opacity="0.35">
+        <circle cx="80"  cy="280" r="1.5" fill="#4f46e5"><animate attributeName="cy" values="280;240;280" dur="6s"  repeatCount="indefinite"/><animate attributeName="opacity" values=".35;.7;.35" dur="6s" repeatCount="indefinite"/></circle>
+        <circle cx="160" cy="400" r="1"   fill="#06b6d4"><animate attributeName="cy" values="400;355;400" dur="8s"  repeatCount="indefinite"/><animate attributeName="opacity" values=".35;.6;.35" dur="8s" repeatCount="indefinite"/></circle>
+        <circle cx="560" cy="170" r="1.5" fill="#f97316"><animate attributeName="cy" values="170;135;170" dur="7s"  repeatCount="indefinite"/><animate attributeName="opacity" values=".35;.65;.35" dur="7s" repeatCount="indefinite"/></circle>
+        <circle cx="750" cy="380" r="1"   fill="#22c55e"><animate attributeName="cy" values="380;340;380" dur="9s"  repeatCount="indefinite"/><animate attributeName="opacity" values=".35;.55;.35" dur="9s" repeatCount="indefinite"/></circle>
+        <circle cx="430" cy="490" r="1.5" fill="#a855f7"><animate attributeName="cy" values="490;450;490" dur="5.5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".35;.7;.35" dur="5.5s" repeatCount="indefinite"/></circle>
+        <circle cx="300" cy="140" r="1"   fill="#818cf8"><animate attributeName="cy" values="140;105;140" dur="7.5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".35;.6;.35" dur="7.5s" repeatCount="indefinite"/></circle>
+        <circle cx="820" cy="210" r="1.5" fill="#f59e0b"><animate attributeName="cy" values="210;175;210" dur="6.5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".35;.65;.35" dur="6.5s" repeatCount="indefinite"/></circle>
+      </g>
+
+      <!-- ══ GLOW PATHS (lit up during packet travel) ══ -->
+      <!-- c→rl / rl→c glow path -->
+      <path id="gvp-crl"   d="M 228 72 C 370 72 430 130 430 202"  fill="none" stroke="#818cf8" stroke-width="5" opacity="0" filter="url(#blur-path)"/>
+      <!-- rl→redis / redis→rl glow path -->
+      <path id="gvp-rlr"   d="M 568 255 C 665 255 715 198 715 130" fill="none" stroke="#f59e0b" stroke-width="5" opacity="0" filter="url(#blur-path)"/>
+      <!-- rl→api glow path -->
+      <path id="gvp-rlapi" d="M 430 322 L 430 420"                 fill="none" stroke="#22c55e" stroke-width="5" opacity="0" filter="url(#blur-path)"/>
+
+      <!-- ══ AMBIENT DASH LINES (always visible, dim) ══ -->
+      <path class="dash-line" d="M 228 72 C 370 72 430 130 430 202"  fill="none" stroke="#181830" stroke-width="1.8" marker-end="url(#arr)"/>
+      <path class="dash-line" d="M 568 255 C 665 255 715 198 715 130" fill="none" stroke="#181830" stroke-width="1.8" marker-end="url(#arr)"/>
+      <path class="dash-line" d="M 430 322 L 430 420"                 fill="none" stroke="#181830" stroke-width="1.8" marker-end="url(#arr)"/>
+
+      <!-- Connection type labels -->
+      <text class="conn-lbl" x="285" y="89">POST  /check</text>
+      <text class="conn-lbl" x="610" y="196">EVALSHA  Lua</text>
+      <text class="conn-lbl" x="442" y="373">forward  →</text>
+
+      <!-- ══ INVISIBLE ANIMATION PATHS ══ -->
+      <path id="ap-c-rl"   d="M 228 72 C 370 72 430 130 430 202"  fill="none" stroke="none"/>
+      <path id="ap-rl-r"   d="M 568 255 C 665 255 715 198 715 130" fill="none" stroke="none"/>
+      <path id="ap-r-rl"   d="M 715 130 C 715 198 665 255 568 255" fill="none" stroke="none"/>
+      <path id="ap-rl-api" d="M 430 322 L 430 420"                 fill="none" stroke="none"/>
+      <path id="ap-rl-c"   d="M 430 202 C 430 130 370 72 228 72"  fill="none" stroke="none"/>
+
+      <!-- ══ PACKET LAYER ══ -->
+      <g id="pkt-layer"></g>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- NODE: CLIENT  x=50 y=32 w=178 h=80               -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <g id="node-client">
+        <!-- outer glow halo -->
+        <rect id="halo-client" x="45" y="27" width="188" height="90" rx="15"
+              fill="none" stroke="#7c3aed" stroke-width="2" opacity="0" filter="url(#glow-m)"/>
+        <!-- body -->
+        <rect x="50" y="32" width="178" height="80" rx="12"
+              fill="url(#g-client)" stroke="#5b21b6" stroke-width="1.5"/>
+        <!-- inner shine line -->
+        <rect x="51" y="33" width="176" height="2" rx="2" fill="rgba(255,255,255,0.05)"/>
+        <text x="87"  y="79" font-size="23">💻</text>
+        <text x="118" y="67" class="n-title">CLIENT</text>
+        <text id="st-client" x="118" y="85" class="n-sub">Idle</text>
+        <!-- request counter badge -->
+        <rect id="badge-client-bg" x="192" y="28" width="34" height="16" rx="8" fill="#1e1040" opacity="0"/>
+        <text id="badge-client" x="209" y="40" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#a78bfa" text-anchor="middle" opacity="0">0</text>
+      </g>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- NODE: RATE LIMITER  x=295 y=200 w=270 h=122      -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <g id="node-rl">
+        <rect id="halo-rl" x="290" y="195" width="280" height="132" rx="15"
+              fill="none" stroke="#06b6d4" stroke-width="2" opacity="0" filter="url(#glow-m)"/>
+        <rect x="295" y="200" width="270" height="122" rx="12"
+              fill="url(#g-rl)" stroke="#0e7490" stroke-width="1.5"/>
+        <rect x="296" y="201" width="268" height="2" rx="2" fill="rgba(255,255,255,0.04)"/>
+        <text x="338" y="252" font-size="26">🛡️</text>
+        <text x="378" y="240" class="n-title" style="font-size:14px;font-weight:800">RATE LIMITER</text>
+        <text id="st-rl" x="378" y="258" class="n-sub">Ready — Sliding Window</text>
+        <!-- progress bar -->
+        <rect x="326" y="272" width="208" height="7" rx="3.5" fill="#021420"/>
+        <rect id="bar-rl" x="326" y="272" width="0" height="7" rx="3.5" fill="url(#g-mrl)"/>
+        <text id="lbl-rl"  x="326" y="291" class="n-meta">0 / — requests in window</text>
+        <text id="lbl-rl2" x="326" y="305" class="n-meta" fill="#1a3040">—</text>
+      </g>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- NODE: REDIS  x=622 y=28 w=196 h=106              -->
+      <!-- (expanded height to fit ZSET dot grid)            -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <g id="node-redis">
+        <rect id="halo-redis" x="617" y="23" width="206" height="116" rx="15"
+              fill="none" stroke="#f97316" stroke-width="2" opacity="0" filter="url(#glow-m)"/>
+        <rect x="622" y="28" width="196" height="106" rx="12"
+              fill="url(#g-redis)" stroke="#c2410c" stroke-width="1.5"/>
+        <rect x="623" y="29" width="194" height="2" rx="2" fill="rgba(255,255,255,0.04)"/>
+        <text x="661" y="72" font-size="22">🗄️</text>
+        <text x="695" y="58" class="n-title">REDIS</text>
+        <text id="st-redis" x="695" y="74" class="n-sub">Waiting…</text>
+        <!-- ZSET dot grid: 10 cols × 2 rows, starting at x=638 y=88 spacing=14 -->
+        <g id="zset-dots"></g>
+        <!-- ZSET count label -->
+        <text id="lbl-redis" x="638" y="123" class="n-meta">ZSET: 0 members</text>
+      </g>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- NODE: API SERVICE  x=295 y=420 w=270 h=83        -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <g id="node-api">
+        <rect id="halo-api" x="290" y="415" width="280" height="93" rx="15"
+              fill="none" stroke="#22c55e" stroke-width="2" opacity="0" filter="url(#glow-m)"/>
+        <rect x="295" y="420" width="270" height="83" rx="12"
+              fill="url(#g-api)" stroke="#15803d" stroke-width="1.5"/>
+        <rect x="296" y="421" width="268" height="2" rx="2" fill="rgba(255,255,255,0.04)"/>
+        <text x="338" y="467" font-size="23">⚙️</text>
+        <text x="378" y="455" class="n-title">API SERVICE</text>
+        <text id="st-api" x="378" y="473" class="n-sub">Waiting for requests</text>
+        <!-- served counter -->
+        <text id="lbl-api-count" x="538" y="438" class="n-meta" text-anchor="end">0 served</text>
+      </g>
+
+      <!-- ══ LUA OPERATION PILL (floats near Redis) ══ -->
+      <g id="lua-pill" opacity="0">
+        <rect id="lua-pill-bg" x="505" y="148" height="22" rx="7" fill="#0a0e1e" stroke="#f97316" stroke-width="1.2"/>
+        <text id="lua-pill-txt" x="515" y="163" font-family="JetBrains Mono" font-size="10" fill="#fb923c" font-weight="700"></text>
+      </g>
+
+      <!-- ══ SLIDING WINDOW TIMELINE STRIP ══ -->
+      <!-- Title label -->
+      <text x="55" y="497" font-family="JetBrains Mono" font-size="9" fill="#252550" font-weight="700">SLIDING WINDOW TIMELINE</text>
+      <!-- Now marker label -->
+      <text x="820" y="497" font-family="JetBrains Mono" font-size="8" fill="#252550" font-weight="700" text-anchor="end">NOW →</text>
+      <!-- Track background -->
+      <rect x="50"  y="502" width="810" height="30" rx="6" fill="#08081a" stroke="#151530" stroke-width="1"/>
+      <!-- Timeline content (updated by JS) -->
+      <g id="tl-dots"></g>
+      <!-- Now line -->
+      <line x1="858" y1="502" x2="858" y2="532" stroke="#06b6d4" stroke-width="1.5" opacity="0.5"/>
+      <!-- Window border indicator -->
+      <rect id="tl-window-rect" x="50" y="502" width="810" height="30" rx="6"
+            fill="none" stroke="#1a1a40" stroke-width="1"/>
+      <!-- bottom labels -->
+      <text class="tl-lbl" id="tl-lbl-left"  x="55"  y="546">—</text>
+      <text class="tl-lbl" id="tl-lbl-right" x="858" y="546" text-anchor="end">0s</text>
+      <text class="tl-lbl" x="454" y="546" text-anchor="middle" id="tl-lbl-mid">window center</text>
+    </svg>
+  </div>
+
+  <!-- ── SIDEBAR ── -->
+  <div class="sidebar">
+    <!-- Stats -->
+    <div class="sb-sec">
+      <div class="sb-title">Live Stats</div>
+      <div class="stats-grid">
+        <div class="stat-box" id="sbox-ok">
+          <div class="sv clr-g" id="sv-ok">0</div><div class="sl">Allowed</div>
+        </div>
+        <div class="stat-box" id="sbox-blk">
+          <div class="sv clr-r" id="sv-blk">0</div><div class="sl">Blocked</div>
+        </div>
+        <div class="stat-box">
+          <div class="sv clr-c" id="sv-rem">—</div><div class="sl">Remaining</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Last response -->
+    <div class="sb-sec" id="resp-sec" style="display:none">
+      <div class="sb-title">Last Response</div>
+      <div class="resp-box" id="resp-box"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="sb-sec" style="padding-bottom:8px">
+      <div class="sb-title">
+        <span>Event Log</span><span style="flex:1"></span>
+        <button class="lc-btn" onclick="clearLog()">Clear</button>
+      </div>
+    </div>
+    <div class="log-list" id="log-list">
+      <div class="log-entry sys">
+        <span style="font-size:12px">ℹ️</span>
+        <span class="log-msg">Ready — click <strong>Send</strong> to watch a packet travel through the system.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// CONFIG  (mirrors actual service)
+// ══════════════════════════════════════════
+const ROUTE_CFG = {
+  '/login':    { limit: 5,     windowSecs: 60  },
+  '/posts':    { limit: 200,   windowSecs: 60  },
+  '/profile':  { limit: 50,    windowSecs: 60  },
+  '/api/data': null
+};
+const PLAN_CFG = {
+  FREE:       { limit: 100,   windowSecs: 900 },
+  PRO:        { limit: 1000,  windowSecs: 900 },
+  ENTERPRISE: { limit: 10000, windowSecs: 900 }
+};
+const getCfg = () => {
+  const r = document.getElementById('route').value;
+  const p = document.getElementById('plan').value;
+  return ROUTE_CFG[r] || PLAN_CFG[p];
+};
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let zset      = [];   // { score }
+let timeline  = [];   // { ts, allowed }
+let totOk = 0, totBlk = 0;
+let animating  = false;
+let autoTimer  = null;
+let tlTimer    = null;
+let seq        = 0;
+const NS = 'http://www.w3.org/2000/svg';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ══════════════════════════════════════════
+// SVG HELPER
+// ══════════════════════════════════════════
+function mkEl(tag, attrs) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+// ══════════════════════════════════════════
+// NODE CENTERS (for pulses/sparks)
+// ══════════════════════════════════════════
+const CENTERS = { client:[139,72], rl:[430,261], redis:[720,81], api:[430,462] };
+
+// ══════════════════════════════════════════
+// PACKET ANIMATION  — glowing comet with trail + label
+// ══════════════════════════════════════════
+function packet(pathId, color, dur = 460, label = '') {
+  return new Promise(done => {
+    const path  = document.getElementById(pathId);
+    const layer = document.getElementById('pkt-layer');
+    const len   = path.getTotalLength();
+    const trail = [];
+    const TRAIL = 18;
+
+    const trailEl = mkEl('polyline', { stroke: color, 'stroke-width': '2.5', fill: 'none',
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: '0.5' });
+    const halo2 = mkEl('circle', { r: '18', fill: color, opacity: '0.12' });
+    const halo1 = mkEl('circle', { r: '9',  fill: color, opacity: '0.3'  });
+    const core  = mkEl('circle', { r: '5',  fill: color, filter: 'url(#glow-s)' });
+
+    const labelEl = label ? mkEl('text', {
+      'font-family': 'JetBrains Mono, monospace',
+      'font-size': '9', 'font-weight': '700',
+      fill: color, opacity: '0.9'
+    }) : null;
+    if (labelEl) { labelEl.textContent = label; }
+
+    [trailEl, halo2, halo1, core].forEach(el => layer.appendChild(el));
+    if (labelEl) layer.appendChild(labelEl);
+
+    const t0 = performance.now();
+    const ease = t => t < .5 ? 2*t*t : -1+(4-2*t)*t;
+
+    (function frame(now) {
+      const t  = Math.min((now - t0) / dur, 1);
+      const pt = path.getPointAtLength(ease(t) * len);
+      [halo2, halo1, core].forEach(c => { c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y); });
+      trail.push([pt.x, pt.y]);
+      if (trail.length > TRAIL) trail.shift();
+      if (trail.length > 1) trailEl.setAttribute('points', trail.map(p => p.join(',')).join(' '));
+      if (labelEl) { labelEl.setAttribute('x', pt.x + 9); labelEl.setAttribute('y', pt.y - 9); }
+      if (t < 1) { requestAnimationFrame(frame); }
+      else {
+        [trailEl, halo2, halo1, core, labelEl].forEach(el => el?.parentNode?.removeChild(el));
+        done();
+      }
+    })(t0);
+  });
+}
+
+// ══════════════════════════════════════════
+// SPARK BURST  — particles shoot out on arrival
+// ══════════════════════════════════════════
+function sparks(nodeId, color, count = 10) {
+  const [cx, cy] = CENTERS[nodeId];
+  const layer    = document.getElementById('pkt-layer');
+  const pts = Array.from({ length: count }, (_, i) => {
+    const angle = (i / count) * Math.PI * 2 + (Math.random() - .5) * .6;
+    const speed = 32 + Math.random() * 26;
+    const el = mkEl('circle', { r: 2 + Math.random() * 1.5, fill: color, opacity: '1' });
+    layer.appendChild(el);
+    return { el, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
+  });
+  const t0 = performance.now(), D = 520;
+  (function a(now) {
+    const t = Math.min((now - t0) / D, 1);
+    pts.forEach(p => {
+      p.el.setAttribute('cx', cx + p.vx * t);
+      p.el.setAttribute('cy', cy + p.vy * t + 12 * t * t); // slight gravity
+      p.el.setAttribute('r', (2 + .5) * (1 - t * .8));
+      p.el.setAttribute('opacity', 1 - t * t);
+    });
+    if (t < 1) requestAnimationFrame(a);
+    else pts.forEach(p => p.el.parentNode?.removeChild(p.el));
+  })(t0);
+}
+
+// ══════════════════════════════════════════
+// PULSE RING  — expanding ring on arrival
+// ══════════════════════════════════════════
+function pulse(nodeId, color) {
+  const [cx, cy] = CENTERS[nodeId];
+  const layer    = document.getElementById('pkt-layer');
+  // two rings for depth
+  [{ r0: 24, rEnd: 85, D: 650, sw: 2, op: .9 },
+   { r0: 14, rEnd: 55, D: 500, sw: 1.5, op: .6 }].forEach(cfg2 => {
+    const ring = mkEl('circle', { cx, cy, r: cfg2.r0, fill: 'none',
+      stroke: color, 'stroke-width': cfg2.sw, opacity: cfg2.op });
+    layer.appendChild(ring);
+    const t0 = performance.now();
+    (function a(now) {
+      const t = Math.min((now - t0) / cfg2.D, 1);
+      ring.setAttribute('r', cfg2.r0 + t * (cfg2.rEnd - cfg2.r0));
+      ring.setAttribute('opacity', cfg2.op * (1 - t));
+      if (t < 1) requestAnimationFrame(a);
+      else ring.parentNode?.removeChild(ring);
+    })(t0);
+  });
+}
+
+// ══════════════════════════════════════════
+// GLOW PATH  — light up a connection line during transit
+// ══════════════════════════════════════════
+function glowPath(id, color, dur) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.setAttribute('stroke', color);
+  // fade in
+  const t0 = performance.now();
+  (function fi(now) {
+    const t = Math.min((now - t0) / 120, 1);
+    el.setAttribute('opacity', t * .7);
+    if (t < 1) requestAnimationFrame(fi);
+  })(t0);
+  // fade out after dur
+  setTimeout(() => {
+    const t1 = performance.now();
+    (function fo(now) {
+      const t = Math.min((now - t1) / 280, 1);
+      el.setAttribute('opacity', .7 * (1 - t));
+      if (t < 1) requestAnimationFrame(fo);
+      else el.setAttribute('opacity', 0);
+    })(t1);
+  }, dur - 100);
+}
+
+// ══════════════════════════════════════════
+// NODE EFFECTS
+// ══════════════════════════════════════════
+function glow(nodeId, on, color) {
+  const el = document.getElementById('halo-' + nodeId);
+  if (!el) return;
+  el.setAttribute('opacity', on ? 1 : 0);
+  if (color) el.setAttribute('stroke', color);
+  if (on) el.classList.add('halo-active');
+  else    el.classList.remove('halo-active');
+}
+
+function st(nodeId, text, color) {
+  const el = document.getElementById('st-' + nodeId);
+  if (el) { el.textContent = text; el.setAttribute('fill', color || '#64748b'); }
+}
+
+// ══════════════════════════════════════════
+// ZSET DOT GRID  (inside Redis node)
+// Grid: 10 cols × 2 rows, origin (638, 88), spacing 14px
+// ══════════════════════════════════════════
+const ZSET_COLS = 10, ZSET_ROWS = 2, ZSET_MAX = 20;
+const ZSET_OX = 638, ZSET_OY = 88, ZSET_SP = 14;
+
+function updateZsetDots(count, limit) {
+  const g   = document.getElementById('zset-dots');
+  const show = Math.min(count, ZSET_MAX);
+  g.innerHTML = '';
+  for (let i = 0; i < ZSET_MAX; i++) {
+    const col = i % ZSET_COLS, row = Math.floor(i / ZSET_COLS);
+    const cx  = ZSET_OX + col * ZSET_SP;
+    const cy  = ZSET_OY + row * ZSET_SP;
+    const filled = i < show;
+    const isNew  = filled && i === show - 1;
+    const dot = mkEl('circle', {
+      cx, cy, r: filled ? 4 : 3.5,
+      fill:        filled ? '#f97316' : 'none',
+      stroke:      filled ? 'none' : '#2a1205',
+      'stroke-width': 1,
+      opacity: filled ? (isNew ? 1 : 0.65) : 0.25,
+      filter: filled ? 'url(#glow-s)' : ''
+    });
+    // animate newest dot popping in
+    if (isNew) {
+      dot.setAttribute('r', 0);
+      const t0 = performance.now();
+      (function a(now) {
+        const t = Math.min((now - t0) / 280, 1);
+        const et = t < .5 ? 2*t*t : -1+(4-2*t)*t;
+        dot.setAttribute('r', 4 * et);
+        if (t < 1) requestAnimationFrame(a);
+      })(t0);
+    }
+    g.appendChild(dot);
+  }
+  document.getElementById('lbl-redis').textContent =
+    `ZSET: ${count}${count > ZSET_MAX ? '+' : ''} member${count !== 1 ? 's' : ''}`;
+}
+
+// ══════════════════════════════════════════
+// RL PROGRESS BAR
+// ══════════════════════════════════════════
+function setRLBar(count, limit) {
+  const pct = Math.min(count / limit, 1);
+  const bar = document.getElementById('bar-rl');
+  bar.setAttribute('width', pct * 208);
+  bar.setAttribute('fill', pct > .9 ? '#ef4444' : pct > .7 ? '#f59e0b' : 'url(#g-mrl)');
+  document.getElementById('lbl-rl').textContent = `${count} / ${limit} requests in window`;
+}
+
+// ══════════════════════════════════════════
+// SLIDING WINDOW TIMELINE
+// ══════════════════════════════════════════
+const TL_X = 50, TL_W = 810, TL_Y = 517;
+
+function drawTimeline() {
+  const cfg    = getCfg();
+  const now    = Date.now();
+  const wMs    = cfg.windowSecs * 1000;
+  const g      = document.getElementById('tl-dots');
+  g.innerHTML  = '';
+
+  // label: left edge = -windowSecs
+  document.getElementById('tl-lbl-left').textContent  = `-${cfg.windowSecs}s`;
+  document.getElementById('tl-lbl-mid').textContent   = `-${(cfg.windowSecs / 2).toFixed(0)}s`;
+
+  // prune entries older than 2× window
+  timeline = timeline.filter(e => now - e.ts < wMs * 2);
+
+  timeline.forEach(e => {
+    const age = now - e.ts;
+    if (age > wMs) return; // outside window, skip
+    const x   = TL_X + TL_W * (1 - age / wMs);
+    const pct = age / wMs;
+    const dot = mkEl('circle', {
+      cx: x, cy: TL_Y,
+      r:  5.5,
+      fill:    e.allowed ? '#22c55e' : '#ef4444',
+      opacity: Math.max(0.25, 1 - pct * 0.6),
+      filter:  'url(#glow-s)'
+    });
+    g.appendChild(dot);
+  });
+}
+
+function startTimeline() {
+  if (tlTimer) return;
+  tlTimer = setInterval(drawTimeline, 75);
+}
+
+// ══════════════════════════════════════════
+// LUA PILL
+// ══════════════════════════════════════════
+function showLua(text) {
+  const pill = document.getElementById('lua-pill');
+  const bg   = document.getElementById('lua-pill-bg');
+  const txt  = document.getElementById('lua-pill-txt');
+  txt.textContent = text;
+  const w = text.length * 6.6 + 22;
+  bg.setAttribute('width', w);
+  bg.setAttribute('x', 815 - w);
+  txt.setAttribute('x', 825 - w);
+  pill.setAttribute('opacity', 1);
+}
+const hideLua = () => document.getElementById('lua-pill').setAttribute('opacity', 0);
+
+// ══════════════════════════════════════════
+// SIDEBAR
+// ══════════════════════════════════════════
+function updateStats(allowed, rem) {
+  document.getElementById('sv-ok').textContent  = totOk;
+  document.getElementById('sv-blk').textContent = totBlk;
+  document.getElementById('sv-rem').textContent = allowed ? rem : '0';
+  const box = document.getElementById(allowed ? 'sbox-ok' : 'sbox-blk');
+  box.classList.add(allowed ? 'pulse-ok' : 'pulse-err');
+  setTimeout(() => box.classList.remove('pulse-ok', 'pulse-err'), 420);
+}
+
+function showResp(allowed, limit, rem, resetAfter) {
+  document.getElementById('resp-sec').style.display = '';
+  const box = document.getElementById('resp-box');
+  box.className = 'resp-box ' + (allowed ? 'ok' : 'err');
+  const jk = k => `<span class="jk">"${k}"</span>`;
+  const jt = v => `<span class="jvt">${v}</span>`;
+  const jf = v => `<span class="jvf">${v}</span>`;
+  const jn = v => `<span class="jvn">${v}</span>`;
+  const js = v => `<span class="jvs">"${v}"</span>`;
+  box.innerHTML = `
+    <div class="resp-hdr ${allowed ? 'ok' : 'err'}">${allowed ? '✅ HTTP 200 OK' : '🚫 HTTP 429 Too Many Requests'}</div>
+    <div class="resp-body">{<br>
+    &nbsp;&nbsp;${jk('allowed')}: ${allowed ? jt('true') : jf('false')},<br>
+    &nbsp;&nbsp;${jk('limit')}: ${jn(limit)},<br>
+    &nbsp;&nbsp;${jk('remaining')}: ${jn(allowed ? rem : 0)},<br>
+    ${!allowed ? `&nbsp;&nbsp;${jk('reason')}: ${js('Rate limit exceeded')},<br>
+    &nbsp;&nbsp;${jk('retryAfter')}: ${jn(resetAfter)}<br>` : ''}}</div>`;
+}
+
+function addLog(ok, userId, route, plan, count, limit, rem) {
+  const list = document.getElementById('log-list');
+  const e    = document.createElement('div');
+  e.className = 'log-entry ' + (ok ? 'ok' : 'err');
+  const t = new Date().toLocaleTimeString('en-US', { hour12: false });
+  e.innerHTML = `
+    <span class="log-time">${t}</span>
+    <span style="font-size:12px">${ok ? '✅' : '🚫'}</span>
+    <span class="log-msg">
+      <strong>${userId}</strong> → <strong>${route}</strong>
+      [${plan}] ${ok ? `${count}/${limit} · ${rem} left` : `BLOCKED ${count}/${limit}`}
+    </span>`;
+  list.insertBefore(e, list.firstChild);
+  while (list.children.length > 60) list.removeChild(list.lastChild);
+}
+
+function clearLog() {
+  document.getElementById('log-list').innerHTML =
+    '<div class="log-entry sys"><span style="font-size:12px">🗑️</span><span class="log-msg">Log cleared.</span></div>';
+}
+
+// ══════════════════════════════════════════
+// SEND REQUEST  — full animated sequence
+// ══════════════════════════════════════════
+async function sendRequest() {
+  if (animating) return;
+  animating = true;
+  document.getElementById('sendBtn').disabled  = true;
+  document.getElementById('burstBtn').disabled = true;
+
+  const userId = document.getElementById('userId').value || 'anonymous';
+  const route  = document.getElementById('route').value;
+  const plan   = document.getElementById('plan').value;
+  const cfg    = getCfg();
+
+  // ── Simulate Lua script  ──────────────────────────────
+  const nowMs    = Date.now();
+  const windowMs = cfg.windowSecs * 1000;
+  const before   = zset.length;
+  zset     = zset.filter(m => m.score > nowMs - windowMs);  // ZREMRANGEBYSCORE
+  const pruned   = before - zset.length;
+  const count    = zset.length;                              // ZCARD
+  const allowed  = count < cfg.limit;                       // decision
+  if (allowed) zset.push({ score: nowMs + seq++ });         // ZADD
+  const remaining = allowed ? cfg.limit - zset.length : 0;
+
+  // Record in timeline
+  timeline.push({ ts: nowMs, allowed });
+  startTimeline();
+
+  // ── PHASE 1: CLIENT → RATE LIMITER ───────────────────
+  st('client', 'Sending POST /check…', '#a78bfa');
+  glow('client', true);
+  st('rl', 'Incoming…', '#38bdf8');
+  document.getElementById('lbl-rl2').textContent = `userId: ${userId} · ${route} · [${plan}]`;
+
+  glowPath('gvp-crl', '#818cf8', 520);
+  await packet('ap-c-rl', '#818cf8', 520, 'POST /check');
+  pulse('client', '#818cf8');
+  sparks('rl', '#06b6d4', 9);
+  glow('client', false);
+  glow('rl', true);
+  await sleep(60);
+
+  // ── PHASE 2: RATE LIMITER → REDIS ────────────────────
+  st('rl',    'Querying Redis via EVALSHA…', '#06b6d4');
+  st('redis', 'EVALSHA executing…',         '#f59e0b');
+  glow('redis', true, '#f97316');
+
+  glowPath('gvp-rlr', '#f59e0b', 400);
+  await packet('ap-rl-r', '#f59e0b', 400, 'EVALSHA');
+  sparks('redis', '#f97316', 9);
+  await sleep(80);
+
+  // ── PHASE 3: LUA SCRIPT STEPS ────────────────────────
+  showLua(`ZREMRANGEBYSCORE  (-${pruned})`);
+  st('redis', `ZREMRANGEBYSCORE — pruned ${pruned}`, '#f59e0b');
+  await sleep(210);
+
+  showLua(`ZCARD → count = ${count}`);
+  st('redis', `ZCARD → count = ${count}`, '#fb923c');
+  await sleep(200);
+
+  if (allowed) {
+    showLua(`ZADD + EXPIRE  ✓`);
+    st('redis', 'ZADD ✅  EXPIRE ✅', '#4ade80');
+    glow('redis', true, '#16a34a');
+    updateZsetDots(zset.length, cfg.limit);
+  } else {
+    showLua(`🚫 LIMIT  ${count}/${cfg.limit}`);
+    st('redis', `BLOCKED — ${count}/${cfg.limit}`, '#f87171');
+    glow('redis', true, '#b91c1c');
+  }
+  await sleep(220);
+  hideLua();
+
+  // ── PHASE 4: REDIS → RATE LIMITER (return) ───────────
+  const retColor = allowed ? '#4ade80' : '#f87171';
+  const retLabel = allowed ? `[1, ${remaining}]` : '[0, 0]';
+  glowPath('gvp-rlr', retColor, 400);
+  await packet('ap-r-rl', retColor, 400, retLabel);
+  sparks('rl', retColor, 8);
+  glow('redis', false);
+  st('redis', allowed ? `✅ returned [1, ${remaining}]` : `returned [0, 0]`,
+     allowed ? '#4ade80' : '#f87171');
+  await sleep(60);
+
+  // ── PHASE 5: DECISION ────────────────────────────────
+  if (allowed) {
+    totOk++;
+    st('rl', `✅ ALLOWED — ${zset.length}/${cfg.limit}`, '#22c55e');
+    glow('rl', true, '#16a34a');
+    setRLBar(zset.length, cfg.limit);
+    updateStats(true, remaining);
+    showResp(true, cfg.limit, remaining, cfg.windowSecs);
+
+    // Forward to API
+    st('api', '⚡ Receiving forwarded request…', '#22c55e');
+    glowPath('gvp-rlapi', '#22c55e', 380);
+    await packet('ap-rl-api', '#22c55e', 380, '→ forward');
+    sparks('api', '#22c55e', 8);
+    pulse('api', '#22c55e');
+    glow('api', true);
+    st('api', `✅ 200 OK — request served`, '#22c55e');
+    document.getElementById('lbl-api-count').textContent = `${totOk} served`;
+
+    addLog(true, userId, route, plan, zset.length, cfg.limit, remaining);
+
+    await sleep(620);
+    glow('api', false);
+    st('api', `Served ${totOk} request${totOk !== 1 ? 's' : ''}`, '#4ade80');
+
+  } else {
+    totBlk++;
+    st('rl', `🚫 BLOCKED — ${count}/${cfg.limit} reached`, '#ef4444');
+    glow('rl', true, '#b91c1c');
+    setRLBar(count, cfg.limit);
+    updateStats(false, 0);
+    showResp(false, cfg.limit, 0, cfg.windowSecs);
+
+    addLog(false, userId, route, plan, count, cfg.limit, 0);
+
+    await sleep(100);
+    st('client', '⛔ 429 Too Many Requests', '#f87171');
+    glowPath('gvp-crl', '#ef4444', 520);
+    await packet('ap-rl-c', '#ef4444', 520, '429 →');
+    sparks('client', '#ef4444', 9);
+    pulse('client', '#ef4444');
+    glow('client', true, '#b91c1c');
+
+    await sleep(680);
+    glow('client', false);
+    st('client', 'Idle', null);
+  }
+
+  // ── RESET ─────────────────────────────────────────────
+  await sleep(260);
+  glow('rl', false);
+  st('rl', 'Ready — Sliding Window', null);
+  st('redis', 'Idle', null);
+  document.getElementById('lbl-rl2').textContent = '—';
+
+  animating = false;
+  document.getElementById('sendBtn').disabled  = false;
+  document.getElementById('burstBtn').disabled = false;
+}
+
+// ══════════════════════════════════════════
+// BURST
+// ══════════════════════════════════════════
+async function triggerBurst() {
+  if (animating) return;
+  document.getElementById('sendBtn').disabled  = true;
+  document.getElementById('burstBtn').disabled = true;
+  for (let i = 0; i < 10; i++) {
+    await sendRequest();
+    await sleep(35);
+  }
+  document.getElementById('sendBtn').disabled  = false;
+  document.getElementById('burstBtn').disabled = false;
+}
+function triggerSend() { if (!animating) sendRequest(); }
+
+// ══════════════════════════════════════════
+// AUTO-FIRE
+// ══════════════════════════════════════════
+function setAuto(ms) {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  document.querySelectorAll('.sp-btn').forEach(b => b.classList.remove('on'));
+  document.getElementById('ab0').classList.add('on');
+  if (!ms) return;
+  const map = { 700:'ab700', 280:'ab280', 110:'ab110' };
+  if (map[ms]) { document.getElementById(map[ms]).classList.add('on'); document.getElementById('ab0').classList.remove('on'); }
+  autoTimer = setInterval(() => { if (!animating) sendRequest(); }, ms);
+}
+
+// ══════════════════════════════════════════
+// RESET
+// ══════════════════════════════════════════
+function hardReset() {
+  if (autoTimer) clearInterval(autoTimer);
+  if (tlTimer)   clearInterval(tlTimer);
+  autoTimer = tlTimer = null;
+  zset = []; timeline = []; totOk = 0; totBlk = 0; seq = 0; animating = false;
+  document.querySelectorAll('.sp-btn').forEach(b => b.classList.remove('on'));
+  document.getElementById('ab0').classList.add('on');
+  document.getElementById('sendBtn').disabled  = false;
+  document.getElementById('burstBtn').disabled = false;
+  document.getElementById('pkt-layer').innerHTML = '';
+  document.getElementById('tl-dots').innerHTML   = '';
+  document.getElementById('zset-dots').innerHTML = '';
+  document.getElementById('sv-ok').textContent   = '0';
+  document.getElementById('sv-blk').textContent  = '0';
+  document.getElementById('sv-rem').textContent  = '—';
+  document.getElementById('lbl-api-count').textContent = '0 served';
+  document.getElementById('resp-sec').style.display = 'none';
+  document.getElementById('bar-rl').setAttribute('width', 0);
+  document.getElementById('lbl-rl').textContent    = '0 / — requests in window';
+  document.getElementById('lbl-redis').textContent = 'ZSET: 0 members';
+  document.getElementById('lbl-rl2').textContent   = '—';
+  ['gvp-crl','gvp-rlr','gvp-rlapi'].forEach(id => document.getElementById(id)?.setAttribute('opacity', 0));
+  hideLua();
+  ['client','rl','redis','api'].forEach(id => {
+    glow(id, false);
+    st(id, id === 'rl' ? 'Ready — Sliding Window' : id === 'api' ? 'Waiting for requests' : 'Idle', null);
+  });
+  clearLog();
+}
+
+// ══════════════════════════════════════════
+// INIT — draw empty dot grid on load
+// ══════════════════════════════════════════
+updateZsetDots(0, 200);
+</script>
+</body>
+</html>
