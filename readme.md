@@ -6,10 +6,10 @@ A distributed rate limiting microservice built with Node.js, TypeScript, and Red
 
 ## Services
 
-| Service | Port | Description |
-|---------|------|-------------|
-| rate-limiter-service | 3001 | Core microservice — enforces rate limits |
-| dummy-api-service | 3002 | Consumer service — calls rate limiter before responding |
+| Service | Container Port | Host Port | Description |
+|---------|----------------|-----------|-------------|
+| rate-limiter-service | 3001 | 3101 | Core microservice — enforces rate limits |
+| dummy-api-service | 3002 | 3102 | Consumer service — calls rate limiter before responding |
 
 ---
 
@@ -64,6 +64,8 @@ cd rate-limiter-monorepo
 docker-compose up --build
 ```
 
+After the stack starts, use `http://localhost:3101` for the rate limiter and `http://localhost:3102` for the dummy API from your host machine.
+
 ### Without Docker
 
 ```bash
@@ -89,7 +91,7 @@ npm run dev
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| PORT | 3001 | Service port |
+| PORT | 3001 | Container port |
 | REDIS_URL | redis://localhost:6379 | Redis connection |
 | FAILOVER_MODE | open | `open` or `closed` |
 | LOG_LEVEL | info | Pino log level |
@@ -98,8 +100,8 @@ npm run dev
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| PORT | 3002 | Service port |
-| RATE_LIMITER_URL | http://localhost:3001 | Rate limiter URL |
+| PORT | 3002 | Container port |
+| RATE_LIMITER_URL | http://rate-limiter-service:3001 | Rate limiter URL inside Docker |
 
 ---
 
@@ -116,30 +118,43 @@ Configured via `FAILOVER_MODE` env variable.
 
 ```
 rate-limiter-monorepo/
-├── rate-limiter-service/
-│   ├── src/
-│   │   ├── config/        # plan limits, route limits, env config
-│   │   ├── redis/         # Redis client + Lua script loader
-│   │   ├── scripts/       # sliding_window.lua
-│   │   ├── middleware/    # Express middleware
-│   │   ├── services/      # core business logic
-│   │   ├── routes/        # POST /check endpoint
-│   │   ├── logger/        # Pino structured logger
-│   │   ├── metrics/       # in-memory counters
-│   │   ├── types/         # TypeScript interfaces and enums
-│   │   ├── app.ts
-│   │   └── server.ts
-│   ├── Dockerfile
-│   └── .env
-├── dummy-api-service/
-│   ├── src/
-│   │   ├── app.ts         # /login, /posts, /profile routes
-│   │   ├── rateLimitClient.ts  # HTTP client for POST /check
-│   │   └── server.ts
-│   ├── Dockerfile
-│   └── .env
+├── readme.md
 ├── docker-compose.yml
-└── README.md
+├── dummy-api-service/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+│       ├── app.ts
+│       ├── rateLimitClient.ts
+│       ├── server.ts
+│       └── types.ts
+├── rate-limiter-service/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+│       ├── app.ts
+│       ├── server.ts
+│       ├── config/
+│       │   └── index.ts
+│       ├── logger/
+│       │   └── index.ts
+│       ├── middleware/
+│       │   └── rateLimiter.ts
+│       ├── metrics/
+│       │   └── index.ts
+│       ├── redis/
+│       │   ├── client.ts
+│       │   └── luaScripts.ts
+│       ├── routes/
+│       │   └── check.ts
+│       ├── scripts/
+│       │   └── sliding_window.lua
+│       ├── services/
+│       │   └── rateLimiterService.ts
+│       └── types/
+│           └── index.ts
 ```
 
 ---
