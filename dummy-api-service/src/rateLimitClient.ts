@@ -4,7 +4,7 @@
 
 
 import axios from 'axios'
-import { RateLimitResult } from "../../rate-limiter-service/src/types/index"
+import { RateLimitResult } from './types'
 
 // Read the rate limiter URL from env
 const RATE_LIMITER_URL: string = process.env.RATE_LIMITER_URL || "http://localhost:3001"

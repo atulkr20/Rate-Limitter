@@ -4,14 +4,18 @@ import pino from "pino"
 
 dotenv.config()
 
-const logger = pino({
-    transport: {
+const loggerOptions: pino.LoggerOptions = {}
+
+if (process.env.NODE_ENV !== "production") {
+    loggerOptions.transport = {
         target: "pino-pretty",
         options: {
             colorize: true,
         },
-    },
-})
+    }
+}
+
+const logger = pino(loggerOptions)
 const PORT = process.env.PORT || 3002
 
 app.listen(PORT, function() {

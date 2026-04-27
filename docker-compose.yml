@@ -1,0 +1,58 @@
+
+version: "3.8"
+
+services:
+
+  # Redis 
+  redis:
+    image: redis:7-alpine        
+    container_name: redis
+    ports:
+      - "6380:6379"             
+    volumes:
+      - redis_data:/data         
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]   
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  #  Rate Limiter Service 
+  rate-limiter-service:
+    build:
+      context: ./rate-limiter-service    
+      dockerfile: Dockerfile
+    container_name: rate-limiter-service
+    ports:
+      - "3101:3001"
+    environment:
+      - PORT=3001
+      - REDIS_URL=redis://redis:6379     
+      - FAILOVER_MODE=open
+      - LOG_LEVEL=info
+    depends_on:
+      redis:
+        condition: service_healthy    
+    restart: unless-stopped             
+
+
+  # Dummy API Service 
+  dummy-api-service:
+    build:
+      context: ./dummy-api-service
+      dockerfile: Dockerfile
+    container_name: dummy-api-service
+    ports:
+      - "3102:3002"
+    environment:
+      - PORT=3002
+      - RATE_LIMITER_URL=http://rate-limiter-service:3001 
+    depends_on:
+      - rate-limiter-service             # 
+    restart: unless-stopped
+
+
+# named volume for Redis data persistence
+volumes:
+  redis_data:
