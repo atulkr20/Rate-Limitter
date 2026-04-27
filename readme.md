@@ -1,4 +1,4 @@
-# rate-limiter-monorepo
+## Rate Limiting Microservice — Built to Scale Horizontally
 
 A distributed rate limiting microservice built with Node.js, TypeScript, and Redis. Implements sliding window algorithm using Redis Sorted Sets and Lua scripting for atomicity.
 
