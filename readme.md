@@ -120,6 +120,8 @@ Configured via `FAILOVER_MODE` env variable.
 rate-limiter-monorepo/
 ├── readme.md
 ├── docker-compose.yml
+├── simulator/
+│   └── index.html
 ├── dummy-api-service/
 │   ├── Dockerfile
 │   ├── package.json
