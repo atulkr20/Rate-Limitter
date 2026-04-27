@@ -20,13 +20,13 @@ if currentCount < limit then
 
 -- if allowed - add this request's timestamp to the sorted set
 -- score = timestamp, member = timestamp
--- using toString(npow) as the members must ne unique strings
 
-redis.call("ZADD", key, now, toString(now))
+-- use tostring(now) because Redis Lua runs in strict mode
+redis.call("ZADD", key, now, tostring(now))
 
 -- setting TL on the key so the redis auto clean it after the window expires 
 -- this prevents memory leaking for inactive users
-redis.call("EXPIRE", key, math.cell(windowMs / 1000))
+redis.call("EXPIRE", key, math.ceil(windowMs / 1000))
 
 -- return allowed = 1, remaining requests
 return { 1, limit - currentCount - 1}

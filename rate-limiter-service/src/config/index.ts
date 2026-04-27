@@ -7,7 +7,7 @@ dotenv.config()
 
 export const SERVER_CONFIG = {
     port: process.env.PORT || 3001,
-    redisUrl: process.env.REDIS_URL || "redis://localhost: 6379",
+    redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
 
     // Fail-open = allow requests when Redis is down
     // Fail-closed: block requests when Redis is down

@@ -13,6 +13,7 @@ router.post("/check", async function(req: Request, res: Response) {
     // Read the body
     // The calling service sends userId, ip, route, plan
     const { userId, ip, route, plan } = req.body
+    const normalizedPlan = typeof plan === "string" ? plan.toUpperCase() : plan
 
     // Basic Validation
 
@@ -30,7 +31,7 @@ router.post("/check", async function(req: Request, res: Response) {
 
     // Object.values(Plan) returns ["free", "Pro", "enterprise"]
 
-    if(!validPlans.includes(plan)) {
+    if(!validPlans.includes(normalizedPlan)) {
         res.status(400).json({
             success: false,
             message: `Invalid plan. Must be one of: ${validPlans.join(", ")}`
@@ -42,7 +43,7 @@ router.post("/check", async function(req: Request, res: Response) {
         userId,
         ip,
         route,
-        plan: plan as Plan   //  cast to plan enum we evalidated it above
+        plan: normalizedPlan as Plan   //  cast to plan enum we validated it above
     }
 
     const result = await checkRateLimit(rateLimitRequest)
@@ -54,6 +55,7 @@ router.post("/check", async function(req: Request, res: Response) {
         allowed: result.allowed,
         limit: result.limit,
         remaining: result.remaining,
+        resetAfter: result.resetAfter,
         reason: result.reason || null
     })
 
