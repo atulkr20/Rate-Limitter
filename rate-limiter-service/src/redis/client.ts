@@ -22,7 +22,7 @@ maxRetriesPerRequest: 3
 
 // These are event Listeners they fire when something happens to the connection 
 
-redis.on('conect', function() {
+redis.on('connect', function() {
     logger.info('Redis connected successfully')
 })
 

@@ -479,7 +479,7 @@ const ROUTE_CFG = {
   '/login':    { limit: 5,     windowSecs: 60  },
   '/posts':    { limit: 200,   windowSecs: 60  },
   '/profile':  { limit: 50,    windowSecs: 60  },
-  '/api/data': null
+  '/api/data': { limit: 100,   windowSecs: 900 }
 };
 const PLAN_CFG = {
   FREE:       { limit: 100,   windowSecs: 900 },
@@ -885,14 +885,18 @@ async function sendRequest() {
       data = { error: `Invalid response: ${responseText.substring(0, 100)}` };
     }
 
-    const limit = parseInt(response.headers.get('X-RateLimit-Limit') || cfg.limit);
-    const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') || 0);
-    const resetAfter = parseInt(response.headers.get('X-RateLimit-Reset') || cfg.windowSecs);
+    const limit = parseInt(response.headers.get('X-RateLimit-Limit') || '') || cfg.limit;
+    const remaining = Math.max(0, parseInt(response.headers.get('X-RateLimit-Remaining') || '') || 0);
+    const resetAfter = parseInt(response.headers.get('X-RateLimit-Reset') || '') || cfg.windowSecs;
     const allowed = response.status !== 429;
 
     if (!response.ok && response.status !== 429) {
       throw new Error(`HTTP ${response.status}: ${data.error || data.message || 'Request failed'}`);
     }
+
+      // Record in timeline for the sliding-window visualization
+      timeline.push({ ts: Date.now(), allowed });
+      startTimeline();
 
     showLua(`Response: ${response.status}`);
     st('redis', allowed ? `Request allowed` : `Request blocked`, allowed ? '#4ade80' : '#f87171');
@@ -959,7 +963,7 @@ async function sendRequest() {
       st('client', 'Idle', null);
     }
 
-  } catch (error: any) {
+  } catch (error) {
     // ── ERROR HANDLING ────────────────────────────────────
     console.error('API Error:', error);
     
@@ -994,7 +998,7 @@ async function sendRequest() {
 // ══════════════════════════════════════════
 // BURST
 // ══════════════════════════════════════════
-async function triggerBurst() {
+window.triggerBurst = async function() {
   if (animating) return;
   document.getElementById('sendBtn').disabled  = true;
   document.getElementById('burstBtn').disabled = true;
@@ -1005,7 +1009,7 @@ async function triggerBurst() {
   document.getElementById('sendBtn').disabled  = false;
   document.getElementById('burstBtn').disabled = false;
 }
-function triggerSend() { if (!animating) sendRequest(); }
+window.triggerSend = function() { if (!animating) sendRequest(); }
 
 // ══════════════════════════════════════════
 // AUTO-FIRE
