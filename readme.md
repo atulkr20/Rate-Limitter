@@ -15,42 +15,11 @@ A distributed rate limiting microservice built with Node.js, TypeScript, and Red
 
 ## How it works
 
-```
-Client → dummy-api-service → POST /check → rate-limiter-service → Redis (Lua + ZSET)
-                          ←  200 allowed / 429 blocked  ←
-```
-
-Architecture (ASCII diagram)
-
-```
-                +-----------------+
-                |     Client      |
-                +--------+--------+
-                         |
-                         | HTTP request (GET/POST)
-                         v
-                +--------+--------+
-                | dummy-api-service|
-                |  (proxy + logic) |
-                +--------+--------+
-                         |
-                         | POST /check (JSON)
-                         v
-                +--------+--------+
-                | rate-limiter    |
-                | service (Node)  |
-                +--------+--------+
-                         |
-                         | EVALSHA (Lua script)
-                         v
-                +--------+--------+
-                |     Redis       |
-                |  (ZSET per key) |
-                +-----------------+
-
-```
-
 Every request to `dummy-api-service` first calls `POST /check` on the rate limiter. The rate limiter runs a Lua script atomically in Redis — removes expired timestamps, counts active ones, allows or blocks. Result is returned with rate limit headers.
+
+## Architecture
+
+![Rate Limiter Architecture](./architecture-diagram.png)
 
 ---
 
