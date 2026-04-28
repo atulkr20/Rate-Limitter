@@ -220,6 +220,10 @@ body::before{
     </select>
   </div>
   <div class="tb-gap"></div>
+  <div class="ctrl">
+    <label>API URL</label>
+    <input id="apiUrl" type="text" value="http://localhost:3102" placeholder="http://localhost:3102"/>
+  </div>
   <div class="auto-row">
     <span class="auto-lbl">Auto:</span>
     <button class="sp-btn on" id="ab0"   onclick="setAuto(0)">OFF</button>
@@ -817,7 +821,7 @@ function clearLog() {
 }
 
 // ══════════════════════════════════════════
-// SEND REQUEST  — full animated sequence
+// SEND REQUEST  — make real API call
 // ══════════════════════════════════════════
 async function sendRequest() {
   if (animating) return;
@@ -828,31 +832,17 @@ async function sendRequest() {
   const userId = document.getElementById('userId').value || 'anonymous';
   const route  = document.getElementById('route').value;
   const plan   = document.getElementById('plan').value;
+  const apiUrl = document.getElementById('apiUrl').value || 'http://localhost:3102';
   const cfg    = getCfg();
 
-  // ── Simulate Lua script  ──────────────────────────────
-  const nowMs    = Date.now();
-  const windowMs = cfg.windowSecs * 1000;
-  const before   = zset.length;
-  zset     = zset.filter(m => m.score > nowMs - windowMs);  // ZREMRANGEBYSCORE
-  const pruned   = before - zset.length;
-  const count    = zset.length;                              // ZCARD
-  const allowed  = count < cfg.limit;                       // decision
-  if (allowed) zset.push({ score: nowMs + seq++ });         // ZADD
-  const remaining = allowed ? cfg.limit - zset.length : 0;
-
-  // Record in timeline
-  timeline.push({ ts: nowMs, allowed });
-  startTimeline();
-
   // ── PHASE 1: CLIENT → RATE LIMITER ───────────────────
-  st('client', 'Sending POST /check…', '#a78bfa');
+  st('client', 'Sending request…', '#a78bfa');
   glow('client', true);
   st('rl', 'Incoming…', '#38bdf8');
   document.getElementById('lbl-rl2').textContent = `userId: ${userId} · ${route} · [${plan}]`;
 
   glowPath('gvp-crl', '#818cf8', 520);
-  await packet('ap-c-rl', '#818cf8', 520, 'POST /check');
+  await packet('ap-c-rl', '#818cf8', 520, 'POST ' + route);
   pulse('client', '#818cf8');
   sparks('rl', '#06b6d4', 9);
   glow('client', false);
@@ -869,85 +859,124 @@ async function sendRequest() {
   sparks('redis', '#f97316', 9);
   await sleep(80);
 
-  // ── PHASE 3: LUA SCRIPT STEPS ────────────────────────
-  showLua(`ZREMRANGEBYSCORE  (-${pruned})`);
-  st('redis', `ZREMRANGEBYSCORE — pruned ${pruned}`, '#f59e0b');
-  await sleep(210);
+  try {
+    // ── PHASE 3: MAKE ACTUAL API REQUEST ────────────────
+    showLua(`Making API call...`);
+    st('redis', `Processing request...`, '#f59e0b');
+    
+    const response = await fetch(`${apiUrl}${route}`, {
+      method: route === '/login' ? 'POST' : 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-ID': userId,
+        'X-User-Plan': plan
+      },
+      body: route === '/login' ? JSON.stringify({}) : undefined
+    });
 
-  showLua(`ZCARD → count = ${count}`);
-  st('redis', `ZCARD → count = ${count}`, '#fb923c');
-  await sleep(200);
+    // Get response text first to check content type
+    const contentType = response.headers.get('content-type');
+    const responseText = await response.text();
+    
+    let data;
+    try {
+      data = contentType?.includes('application/json') ? JSON.parse(responseText) : { error: responseText };
+    } catch (parseErr) {
+      data = { error: `Invalid response: ${responseText.substring(0, 100)}` };
+    }
 
-  if (allowed) {
-    showLua(`ZADD + EXPIRE  ✓`);
-    st('redis', 'ZADD ok, EXPIRE ok', '#4ade80');
-    glow('redis', true, '#16a34a');
-    updateZsetDots(zset.length, cfg.limit);
-  } else {
-    showLua(`LIMIT  ${count}/${cfg.limit}`);
-    st('redis', `BLOCKED — ${count}/${cfg.limit}`, '#f87171');
-    glow('redis', true, '#b91c1c');
-  }
-  await sleep(220);
-  hideLua();
+    const limit = parseInt(response.headers.get('X-RateLimit-Limit') || cfg.limit);
+    const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') || 0);
+    const resetAfter = parseInt(response.headers.get('X-RateLimit-Reset') || cfg.windowSecs);
+    const allowed = response.status !== 429;
 
-  // ── PHASE 4: REDIS → RATE LIMITER (return) ───────────
-  const retColor = allowed ? '#4ade80' : '#f87171';
-  const retLabel = allowed ? `[1, ${remaining}]` : '[0, 0]';
-  glowPath('gvp-rlr', retColor, 400);
-  await packet('ap-r-rl', retColor, 400, retLabel);
-  sparks('rl', retColor, 8);
-  glow('redis', false);
-  st('redis', allowed ? `Returned [1, ${remaining}]` : `Returned [0, 0]`,
-     allowed ? '#4ade80' : '#f87171');
-  await sleep(60);
+    if (!response.ok && response.status !== 429) {
+      throw new Error(`HTTP ${response.status}: ${data.error || data.message || 'Request failed'}`);
+    }
 
-  // ── PHASE 5: DECISION ────────────────────────────────
-  if (allowed) {
-    totOk++;
-    st('rl', `ALLOWED — ${zset.length}/${cfg.limit}`, '#22c55e');
-    glow('rl', true, '#16a34a');
-    setRLBar(zset.length, cfg.limit);
-    updateStats(true, remaining);
-    showResp(true, cfg.limit, remaining, cfg.windowSecs);
+    showLua(`Response: ${response.status}`);
+    st('redis', allowed ? `Request allowed` : `Request blocked`, allowed ? '#4ade80' : '#f87171');
+    glow('redis', true, allowed ? '#16a34a' : '#b91c1c');
 
-    // Forward to API
-    st('api', 'Receiving forwarded request...', '#22c55e');
-    glowPath('gvp-rlapi', '#22c55e', 380);
-    await packet('ap-rl-api', '#22c55e', 380, '→ forward');
-    sparks('api', '#22c55e', 8);
-    pulse('api', '#22c55e');
-    glow('api', true);
-    st('api', `200 OK — request served`, '#22c55e');
-    document.getElementById('lbl-api-count').textContent = `${totOk} served`;
+    await sleep(220);
+    hideLua();
 
-    addLog(true, userId, route, plan, zset.length, cfg.limit, remaining);
+    // ── PHASE 4: REDIS → RATE LIMITER (return) ───────────
+    const retColor = allowed ? '#4ade80' : '#f87171';
+    const retLabel = allowed ? `✓ ${remaining} left` : `✗ blocked`;
+    glowPath('gvp-rlr', retColor, 400);
+    await packet('ap-r-rl', retColor, 400, retLabel);
+    sparks('rl', retColor, 8);
+    glow('redis', false);
+    st('redis', allowed ? `Allowed` : `Blocked`, allowed ? '#4ade80' : '#f87171');
+    await sleep(60);
 
-    await sleep(620);
-    glow('api', false);
-    st('api', `Served ${totOk} request${totOk !== 1 ? 's' : ''}`, '#4ade80');
+    // ── PHASE 5: DECISION ────────────────────────────────
+    if (allowed) {
+      totOk++;
+      st('rl', `ALLOWED — ${remaining} left`, '#22c55e');
+      glow('rl', true, '#16a34a');
+      setRLBar(limit - remaining, limit);
+      updateStats(true, remaining);
+      showResp(true, limit, remaining, resetAfter);
 
-  } else {
-    totBlk++;
-    st('rl', `BLOCKED — ${count}/${cfg.limit} reached`, '#ef4444');
+      // Forward to API
+      st('api', 'Receiving request...', '#22c55e');
+      glowPath('gvp-rlapi', '#22c55e', 380);
+      await packet('ap-rl-api', '#22c55e', 380, '→ forward');
+      sparks('api', '#22c55e', 8);
+      pulse('api', '#22c55e');
+      glow('api', true);
+      st('api', `200 OK — request served`, '#22c55e');
+      document.getElementById('lbl-api-count').textContent = `${totOk} served`;
+
+      addLog(true, userId, route, plan, limit - remaining, limit, remaining);
+
+      await sleep(620);
+      glow('api', false);
+      st('api', `Served ${totOk} request${totOk !== 1 ? 's' : ''}`, '#4ade80');
+
+    } else {
+      totBlk++;
+      st('rl', `BLOCKED — limit reached`, '#ef4444');
+      glow('rl', true, '#b91c1c');
+      setRLBar(limit, limit);
+      updateStats(false, 0);
+      showResp(false, limit, 0, resetAfter);
+
+      addLog(false, userId, route, plan, limit, limit, 0);
+
+      await sleep(100);
+      st('client', '429 Too Many Requests', '#f87171');
+      glowPath('gvp-crl', '#ef4444', 520);
+      await packet('ap-rl-c', '#ef4444', 520, '429 →');
+      sparks('client', '#ef4444', 9);
+      pulse('client', '#ef4444');
+      glow('client', true, '#b91c1c');
+
+      await sleep(680);
+      glow('client', false);
+      st('client', 'Idle', null);
+    }
+
+  } catch (error: any) {
+    // ── ERROR HANDLING ────────────────────────────────────
+    console.error('API Error:', error);
+    
+    let errorMsg = error?.message || 'Unknown error';
+    
+    st('rl', `Error: ${errorMsg}`, '#ef4444');
+    st('client', `Connection error`, '#f87171');
+    st('redis', 'Error', '#ef4444');
     glow('rl', true, '#b91c1c');
-    setRLBar(count, cfg.limit);
-    updateStats(false, 0);
-    showResp(false, cfg.limit, 0, cfg.windowSecs);
-
-    addLog(false, userId, route, plan, count, cfg.limit, 0);
-
-    await sleep(100);
-    st('client', '429 Too Many Requests', '#f87171');
     glowPath('gvp-crl', '#ef4444', 520);
-    await packet('ap-rl-c', '#ef4444', 520, '429 →');
-    sparks('client', '#ef4444', 9);
-    pulse('client', '#ef4444');
-    glow('client', true, '#b91c1c');
-
-    await sleep(680);
-    glow('client', false);
+    showResp(false, 0, 0, 0);
+    addLog(false, userId, route, plan, 0, 0, 0);
+    
+    await sleep(800);
+    glow('rl', false);
     st('client', 'Idle', null);
+    st('rl', 'Error', null);
   }
 
   // ── RESET ─────────────────────────────────────────────
