@@ -19,7 +19,7 @@ Every request to `dummy-api-service` first calls `POST /check` on the rate limit
 
 ## Architecture
 
-![Rate Limiter Architecture](./architecture-diagram.png)
+![Rate Limiter Architecture](./architecture-diagram.svg)
 
 ---
 
