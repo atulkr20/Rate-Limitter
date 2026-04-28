@@ -1,56 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 300">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 350" width="1200" height="350">
+  <!-- Light gray background -->
+  <rect width="1200" height="350" fill="#f5f5f5"/>
+  
   <!-- User Box -->
-  <rect x="20" y="120" width="120" height="60" fill="white" stroke="black" stroke-width="2" rx="5"/>
-  <text x="80" y="155" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold">User</text>
+  <rect x="30" y="140" width="100" height="50" fill="white" stroke="black" stroke-width="2" rx="3"/>
+  <text x="80" y="170" text-anchor="middle" font-family="Segoe UI, Arial" font-size="14" font-weight="500">User</text>
   
   <!-- Arrow 1 -->
-  <line x1="140" y1="150" x2="180" y2="150" stroke="black" stroke-width="2"/>
-  <polygon points="180,150 170,145 170,155" fill="black"/>
+  <line x1="130" y1="165" x2="165" y2="165" stroke="black" stroke-width="2"/>
+  <polygon points="165,165 155,160 155,170" fill="black"/>
   
   <!-- Rate Limiter Box -->
-  <rect x="180" y="120" width="140" height="60" fill="white" stroke="black" stroke-width="2" rx="5"/>
-  <text x="250" y="155" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold">Rate Limiter</text>
+  <rect x="165" y="140" width="120" height="50" fill="white" stroke="black" stroke-width="2" rx="3"/>
+  <text x="225" y="170" text-anchor="middle" font-family="Segoe UI, Arial" font-size="14" font-weight="500">Rate Limiter</text>
   
   <!-- Arrow 2 -->
-  <line x1="320" y1="150" x2="360" y2="150" stroke="black" stroke-width="2"/>
-  <polygon points="360,150 350,145 350,155" fill="black"/>
+  <line x1="285" y1="165" x2="320" y2="165" stroke="black" stroke-width="2"/>
+  <polygon points="320,165 310,160 310,170" fill="black"/>
   
   <!-- Check Request Count Box -->
-  <rect x="360" y="120" width="160" height="60" fill="white" stroke="black" stroke-width="2" rx="5"/>
-  <text x="440" y="155" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold">Check Request Count</text>
+  <rect x="320" y="140" width="160" height="50" fill="white" stroke="black" stroke-width="2" rx="3"/>
+  <text x="400" y="170" text-anchor="middle" font-family="Segoe UI, Arial" font-size="14" font-weight="500">Check Request Count</text>
   
   <!-- Arrow 3 -->
-  <line x1="520" y1="150" x2="560" y2="150" stroke="black" stroke-width="2"/>
-  <polygon points="560,150 550,145 550,155" fill="black"/>
+  <line x1="480" y1="165" x2="515" y2="165" stroke="black" stroke-width="2"/>
+  <polygon points="515,165 505,160 505,170" fill="black"/>
   
   <!-- Decision Diamond -->
-  <polygon points="620,150 680,110 740,150 680,190" fill="white" stroke="black" stroke-width="2"/>
-  <text x="680" y="150" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-size="12" font-weight="bold">Limit</text>
-  <text x="680" y="165" text-anchor="middle" dominant-baseline="middle" font-family="Arial" font-size="12" font-weight="bold">Exceeded?</text>
+  <polygon points="580,165 650,110 720,165 650,220" fill="white" stroke="black" stroke-width="2"/>
+  <text x="650" y="160" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" font-weight="500">Limit</text>
+  <text x="650" y="177" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" font-weight="500">Exceeded?</text>
   
-  <!-- Arrow to Allow Request (No) -->
-  <line x1="740" y1="130" x2="800" y2="80" stroke="black" stroke-width="2"/>
-  <text x="770" y="100" font-family="Arial" font-size="12" font-weight="bold">No</text>
-  <polygon points="800,80 791,87 797,95" fill="black"/>
+  <!-- Arrow to Allow (No) -->
+  <line x1="720" y1="120" x2="770" y2="80" stroke="black" stroke-width="2"/>
+  <text x="745" y="95" font-family="Segoe UI, Arial" font-size="13" font-weight="500">No</text>
+  <polygon points="770,80 760,88 768,93" fill="black"/>
   
   <!-- Allow Request Box -->
-  <rect x="800" y="50" width="140" height="60" fill="white" stroke="black" stroke-width="2" rx="5"/>
-  <text x="870" y="85" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold">Allow Request</text>
+  <rect x="770" y="55" width="130" height="50" fill="white" stroke="black" stroke-width="2" rx="3"/>
+  <text x="835" y="85" text-anchor="middle" font-family="Segoe UI, Arial" font-size="14" font-weight="500">Allow Request</text>
   
-  <!-- Arrow to Block Request (Yes) -->
-  <line x1="740" y1="170" x2="800" y2="220" stroke="black" stroke-width="2"/>
-  <text x="770" y="200" font-family="Arial" font-size="12" font-weight="bold">Yes</text>
-  <polygon points="800,220 797,205 791,213" fill="black"/>
+  <!-- Arrow to Block (Yes) -->
+  <line x1="720" y1="210" x2="770" y2="250" stroke="black" stroke-width="2"/>
+  <text x="740" y="235" font-family="Segoe UI, Arial" font-size="13" font-weight="500">Yes</text>
+  <polygon points="770,250 768,237 760,242" fill="black"/>
   
   <!-- Block Request Box -->
-  <rect x="800" y="190" width="140" height="60" fill="white" stroke="black" stroke-width="2" rx="5"/>
-  <text x="870" y="225" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold">Block Request</text>
+  <rect x="770" y="225" width="130" height="50" fill="white" stroke="black" stroke-width="2" rx="3"/>
+  <text x="835" y="255" text-anchor="middle" font-family="Segoe UI, Arial" font-size="14" font-weight="500">Block Request</text>
   
-  <!-- Arrows from Allow and Block to Send Response -->
-  <line x1="940" y1="80" x2="980" y2="130" stroke="black" stroke-width="2"/>
-  <line x1="940" y1="220" x2="980" y2="170" stroke="black" stroke-width="2"/>
+  <!-- Arrow from Allow to Send Response -->
+  <path d="M 900 80 Q 920 80 935 125" stroke="black" stroke-width="2" fill="none"/>
+  <polygon points="935,125 938,113 932,117" fill="black"/>
+  
+  <!-- Arrow from Block to Send Response -->
+  <path d="M 900 250 Q 920 250 935 205" stroke="black" stroke-width="2" fill="none"/>
+  <polygon points="935,205 932,217 938,213" fill="black"/>
   
   <!-- Send Response Box -->
-  <rect x="980" y="100" width="120" height="60" fill="white" stroke="black" stroke-width="2" rx="5"/>
-  <text x="1040" y="135" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold">Send Response</text>
+  <rect x="935" y="140" width="130" height="50" fill="white" stroke="black" stroke-width="2" rx="3"/>
+  <text x="1000" y="170" text-anchor="middle" font-family="Segoe UI, Arial" font-size="14" font-weight="500">Send Response</text>
 </svg>
