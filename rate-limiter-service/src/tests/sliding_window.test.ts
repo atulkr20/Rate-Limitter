@@ -29,7 +29,7 @@ afterAll(async () => {
 })
 
 // Helper
-// Call EVALSHA with the same arguement shape as your actual service will use
+// Calling EVALSHA with the same arguement shape as our actual service will use
 async function callScript(
     key: string,
     now: number,
@@ -120,5 +120,29 @@ describe("sliding_window Lua script", () => {
         const [allowedB, remainingB] = await callScript(KEY_B, NOW, WINDOW_MS, LIMIT)
         expect(allowedB).toBe(1)
         expect(remainingB).toBe(LIMIT - 1)
+    })
+
+    // concurrency tests
+    // This test id for race condition safety
+    describe("sliding_window Lua script Concurency", () => {
+        const KEY ="test:concurrent:user1:/api/data"
+        const WINDOW_MS = 60_000
+        const LIMIT = 10
+        const NOW = Date.now()
+
+        it("should allow exactly LIMIT requests when fired in parallel", async () => {
+            const TOTAL_REQUESTS = 50
+
+            // we will fire 50 requests all at the same time using Promise.all
+            const results: [number, number][] = await Promise.all(
+                Array.from({ length: TOTAL_REQUESTS}, (_, i) => 
+                callScript(KEY, NOW + i, WINDOW_MS, LIMIT))
+            )
+            const allowed = results.filter(([a]) => a === 1).length
+            const rejected = results.filter(([a]) => a === 0).length
+
+            expect(allowed).toBe(LIMIT)
+            expect(rejected).toBe(TOTAL_REQUESTS - LIMIT)
+        })
     })
 })

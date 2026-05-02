@@ -20,7 +20,7 @@ const redis = new ioredis_1.default(index_1.SERVER_CONFIG.redisUrl, {
     maxRetriesPerRequest: 3
 });
 // These are event Listeners they fire when something happens to the connection 
-redis.on('conect', function () {
+redis.on('connect', function () {
     index_2.default.info('Redis connected successfully');
 });
 redis.on('error', function (err) {
